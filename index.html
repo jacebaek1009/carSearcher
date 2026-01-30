@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Car Listings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Car Listing</h1>
+<input type="text" id="carCount" placeholder="How Many Car Do You Want Displayed">
+<input type="text" id="minPrice" placeholder="Set Minimum Price">
+<input type="text" id="maxPrice" placeholder="Set Maximum Price">
+<button onclick="loadCars()">Search</button>
+
+<div id="cars"></div>
+
+<script>
+async function loadCars() {
+    const count = parseInt(document.getElementById("carCount").value);
+    const minPrice = parseInt(document.getElementById("minPrice").value);
+    const maxPrice = parseInt(document.getElementById("maxPrice").value);
+    const response = await fetch("http://127.0.0.1:8000/car", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number_of_cars: count, minPrice: minPrice, maxPrice: maxPrice })
+    });
+
+    const data = await response.json();
+
+    const container = document.getElementById("cars");
+    container.innerHTML = "";  // clear previous results
+
+    if(data.length === 0) {
+        container.innerHTML = "<p>No cars found within the specified price range.</p>";
+        return;
+    }
+    else {
+        data.forEach(car => {
+            container.innerHTML += `
+                <div class="card">
+                    <h2>${car.year} ${car.make} ${car.model}</h2>
+                    <p><strong>Price:</strong> ${car.price}</p>
+                    <p><strong>Mileage:</strong> ${car.mileage}</p>
+                    <p><strong>ID:</strong> ${car.id}</p>
+                </div>
+            `;
+        });
+    }
+}
+</script>
+
+</body>
+</html>
