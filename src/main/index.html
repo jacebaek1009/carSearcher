@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Car Listings</title>
+    <link rel="stylesheet" href="selectBrand.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        .location{
+            border: 0.5px solid #ccc;
+            padding: 10px;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Car Listing</h1>
+<button onclick="getCurrentLocation()">Search Cars in Your Area</button>
+<div id="locationContainer"></div>
+<script>
+    function getCurrentLocation() {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/cars-near-me', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        alert("Failed to get location data");
+                        return;
+                    }
+                    
+                    const data = await response.json();
+                    console.log("Location data:", data);
+                    
+                    // Display ONLY location info
+                    const locationContainer = document.getElementById("locationContainer");
+                    locationContainer.innerHTML = `
+                        <div class="location">
+                            <h2>📍 ${data.location}</h2>
+                            <p><strong>City:</strong> ${data.city || 'Unknown'}</p>
+                            <p><strong>Region:</strong> ${data.region || 'Unknown'}</p>
+                        </div>
+                    `;
+                    
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert("An error occurred while fetching data");
+                }
+            },
+            (error) => {
+                console.error("Error getting location:", error);
+                alert("Could not get your location. Please enable location services.");
+            }
+        );
+    }
+</script>
+
+<button class="open-button" onclick="openCarModel()">Select Car Model</button>
+<div class="form-popup" id="carModelForm">
+  <form action="/action_page.php" class="form-container">
+    <h1>Car Model Filter</h1>
+    
+    <label for="brand"><b>Brand</b></label>
+    <input type="text" placeholder="Enter Brand" name="brand" required>
+    
+    <label for="model"><b>Model</b></label>
+    <input type="text" placeholder="Enter Model" name="model" required>
+    
+    <button type="submit" class="btn">Apply Filter</button>
+    <button type="button" class="btn cancel" onclick="closeCarModel()">Close</button>
+  </form>
+</div>
+
+<script>
+function openCarModel() {
+  document.getElementById("carModelForm").style.display = "block";
+}
+
+function closeCarModel() {
+  document.getElementById("carModelForm").style.display = "none";
+}
+</script>
+
+
+<input type="text" id="carCount" placeholder="How Many Car Do You Want Displayed">
+<input type="text" id="minPrice" placeholder="Set Minimum Price">
+<input type="text" id="maxPrice" placeholder="Set Maximum Price">
+<input type="text" id="minMilage" placeholder="set Minimum Milage">
+<input type="text" id="maxMilage" placeholder="Set Maximum Milage">
+
+<button onclick="loadCars()">Search</button>
+
+<div id="cars"></div>
+<body>
+<script>
+async function loadCars() {
+    const count = parseInt(document.getElementById("carCount").value);
+    const minPrice = parseInt(document.getElementById("minPrice").value);
+    const maxPrice = parseInt(document.getElementById("maxPrice").value);
+    const minMilage = parseInt(document.getElementById("minMilage").value);
+    const maxMilage = parseInt(document.getElementById("maxMilage").value);
+    const response = await fetch("http://127.0.0.1:8000/car", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number_of_cars: count, minPrice: minPrice, maxPrice: maxPrice, minMilage: minMilage, maxMilage: maxMilage })
+    });
+
+    const data = await response.json();
+
+    const container = document.getElementById("cars");
+    container.innerHTML = "";  // clear previous results
+
+    if(data.length === 0) {
+        container.innerHTML = "<p>No cars found within the specified price range.</p>";
+        return;
+    }
+    else {
+        data.forEach(car => {
+            container.innerHTML += `
+                <div class="card">
+                    <h2>${car.year} ${car.make} ${car.model}</h2>
+                    <p><strong>Price:</strong> ${car.price}</p>
+                    <p><strong>Mileage:</strong> ${car.mileage}</p>
+                    <p><strong>ID:</strong> ${car.id}</p>
+                </div>
+            `;
+        });
+    }
+}
+</script>
+
+
+</body>
+</html>
