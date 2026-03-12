@@ -81,6 +81,50 @@
     }
 </script>
 
+<input type="text" id="City" placeholder="Enter City">
+<button onclick="searchByCity()">Search by City</button>
+<div id="cityLocationContainer"></div>
+
+<script>
+    async function searchByCity() {
+        const city = document.getElementById("City").value.trim();
+
+        if (!city) {
+            alert("Please enter a city name.");
+            return;
+        }
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/cars-by-city', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ city: city })
+            });
+
+            if (!response.ok) {
+                alert("Failed to fetch data for the specified city.");
+                return;
+            }
+
+            const data = await response.json();
+            console.log("City data:", data);
+
+            const cityLocationContainer = document.getElementById("cityLocationContainer");
+            cityLocationContainer.innerHTML = `
+                <div class="location">
+                    <h2>📍 ${data.location || city}</h2>
+                    <p><strong>City:</strong> ${data.city || city}</p>
+                    <p><strong>Region:</strong> ${data.region || 'Unknown'}</p>
+                </div>
+            `;
+
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while searching for the city.");
+        }
+    }
+</script>
+
 <button class="open-button" onclick="openCarModel()">Select Car Model</button>
 <div class="form-popup" id="carModelForm">
   <form action="/action_page.php" class="form-container">

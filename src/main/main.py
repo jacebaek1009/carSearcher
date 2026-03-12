@@ -102,6 +102,9 @@ class UserInput(BaseModel):
     minMilage: Optional[int] = None
     maxMilage: Optional[int] = None
 
+class CityRequest(BaseModel):
+    city: str
+
 def priceToInt(priceStr: str) -> int:
     priceStr = priceStr.replace("$", "").replace(",", "").strip()
     try:
@@ -176,6 +179,30 @@ class LocationResponse(BaseModel):
     city: Optional[str] = None
     province: Optional[str] = None
 
+@app.post("/cars-by-city")
+async def get_cars_by_city(city_request: CityRequest):
+    city = city_request.city.strip()
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": city, "format": "json", "addressdetails": 1, "limit": 1},
+            headers={"User-Agent": "KijijiCarSearcher/1.0"}
+        )
+        results = response.json()
+
+    if not results:
+        raise HTTPException(status_code=404, detail=f"City '{city}' not found")
+
+    address = results[0].get("address", {})
+    resolved_city = address.get("city") or address.get("town") or address.get("village") or city
+    region = address.get("state") or address.get("province")
+
+    return {
+        "location": f"{resolved_city}, {region}" if region else resolved_city,
+        "city": resolved_city,
+        "region": region
+    }
 
 @app.post("/cars-near-me")
 async def get_cars_near_me(location_request: LocationRequest):
