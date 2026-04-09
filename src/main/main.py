@@ -6,7 +6,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import re
+from playwright.async_api import async_playwright
 
+from scraper import scrape_kijiji
 
 app = FastAPI(title="Kijiji Car Searcher API")
 
@@ -28,75 +30,16 @@ class Car(BaseModel):
     price: str
     mileage: str
 
-cars_data = [
-    {
-        "id": 1,
-        "make": "Toyota",
-        "model": "Camry",
-        "year": "2018",
-        "price": "$20,000",
-        "mileage": "30,000 km"
-    },
-    {
-        "id": 2,
-        "make": "Honda",
-        "model": "Civic",
-        "year": "2017",
-        "price": "$18,500",
-        "mileage": "40,000 km"
-    },
-    {
-        "id": 3,
-        "make": "Ford",
-        "model": "Focus",
-        "year": "2016",
-        "price": "$15,000",
-        "mileage": "50,000 km"
-    },
-    {
-        "id": 4,
-        "make": "Chevrolet",
-        "model": "Malibu",
-        "year": "2019",
-        "price": "$22,000",
-        "mileage": "25,000 km"
-    },
-    {
-        "id": 5,
-        "make": "Nissan",
-        "model": "Altima",
-        "year": "2015",
-        "price": "$14,000",
-        "mileage": "60,000 km"
-    },
-    {
-        "id": 6,
-        "make": "Hyundai",
-        "model": "Elantra",
-        "year": "2018",
-        "price": "$19,000",
-        "mileage": "35,000 km"
-    },
-    {
-        "id": 7,
-        "make": "Volkswagen",
-        "model": "Jetta",
-        "year": "2017",
-        "price": "$17,500",
-        "mileage": "45,000 km"
-    },
-    {
-        "id": 8,
-        "make": "Subaru",
-        "model": "Impreza",
-        "year": "2016",
-        "price": "$16,000",
-        "mileage": "55,000 km"
-    }
-]
+class CarSearchRequest(BaseModel):
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
-class UserInput(BaseModel):
     number_of_cars: Optional[int] = None
+    minPrice: Optional[int] = None
+    maxPrice: Optional[int] = None
+    minMilage: Optional[int] = None
+    maxMilage: Optional[int] = None
     minPrice: Optional[int] = None
     maxPrice: Optional[int] = None
     minMilage: Optional[int] = None
@@ -121,51 +64,19 @@ def mileageToInt(mileageStr: str) -> int:
 
 lastQuery: None
 
-@app.post("/car")
-def loadCars(userInput: UserInput):
-    n = userInput.number_of_cars
-    setMin = userInput.minPrice
-    setMax = userInput.maxPrice
-    minMilage = userInput.minMilage
-    maxMilage = userInput.maxMilage
+@app.post("/search-cars")
+async def search_cars(req: CarSearchRequest):
+    city = None
 
-    filteredCar = cars_data
-
-    if setMin is not None and setMax is not None:
-        filteredCar = [
-            car for car in cars_data
-            if setMin <= priceToInt(car["price"]) <= setMax
-        ]
-    elif setMin is not None:
-        filteredCar = [
-            car for car in cars_data
-            if priceToInt(car["price"]) >= setMin
-        ]
-    elif setMax is not None:
-        filteredCar = [
-            car for car in cars_data
-            if priceToInt(car["price"]) <= setMax
-        ]
-    if minMilage is not None and maxMilage is not None:
-        filteredCar = [
-            car for car in filteredCar
-            if mileageToInt(car["mileage"]) <= maxMilage
-        ]
-    elif minMilage is not None:
-        filteredCar = [
-            car for car in filteredCar
-            if mileageToInt(car["mileage"]) >= minMilage
-        ]
-    elif maxMilage is not None:
-        filteredCar = [
-            car for car in filteredCar
-            if mileageToInt(car["mileage"]) <= maxMilage
-        ]
-
-    if n is not None:
-        filteredCar = filteredCar[:n]
-
-    return filteredCar
+    # 🌍 Resolve location
+    async with httpx.AsyncClient() as client:
+        if req.city:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": req.city, "format": "json", "limit": 1},
+                headers={"User-Agent": "CarApp"}
+            )
+     
 
 
 ## Location finder functions
@@ -220,11 +131,13 @@ async def get_cars_near_me(location_request: LocationRequest):
         
         city = address.get("city") or address.get("town")
         region = address.get("state") or address.get("province")
+    cars = await scrape_kijiji(target=15, city=city)
     
     # Return cars (you can add distance filtering here later)
     return {
         "location": f"{city}, {region}" if city else "Unknown",
         "city": city,
-        "region": region
+        "region": region,
+        "cars": cars,
     }
 
