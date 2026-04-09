@@ -14,7 +14,7 @@ CITY_LOCATION_IDS = {
  
 async def scrape_kijiji(target: int, city: str, **_) -> list:
     city_slug   = city.lower().replace(" ", "-")
-    location_id = CITY_LOCATION_IDS.get(city.lower(), "l1700203")
+    location_id = CITY_LOCATION_IDS.get(city.lower(), "l1700199")
     results     = []
     page_num    = 1
  
@@ -74,9 +74,10 @@ async def scrape_kijiji(target: int, city: str, **_) -> list:
                 href  = await link_el.get_attribute("href")   if link_el  else None
  
                 pills        = [(await p.inner_text()).strip() for p in pill_els]
-                mileage      = pills[0] if len(pills) > 0 else None
-                transmission = pills[1] if len(pills) > 1 else None
-                fuel_type    = pills[2] if len(pills) > 2 else None
+                print(f"DEBUG pills: {pills}") 
+                mileage      = next((p for p in pills if "km" in p.lower()), None)
+                transmission = next((p for p in pills if any(t in p.lower() for t in ["automatic", "manual", "cvt"])), None)
+                fuel_type    = next((p for p in pills if any(f in p.lower() for f in ["gas", "diesel", "electric", "hybrid", "hydrogen"])), None)
  
                 # parse year / make / model from title e.g. "2019 Toyota Camry LE"
                 make = model = year = None
@@ -139,5 +140,6 @@ if __name__ == "__main__":
             print(f"  Model:        {car['model']}")
             print(f"  Link:         {car['href']}")
             print()
+        
  
     asyncio.run(main())

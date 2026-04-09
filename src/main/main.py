@@ -1,3 +1,9 @@
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from fastapi import FastAPI, HTTPException, Request
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +15,8 @@ import re
 from playwright.async_api import async_playwright
 
 from scraper import scrape_kijiji
+
+print("=== MAIN.PY LOADED ===")
 
 app = FastAPI(title="Kijiji Car Searcher API")
 
@@ -68,7 +76,6 @@ lastQuery: None
 async def search_cars(req: CarSearchRequest):
     city = None
 
-    # 🌍 Resolve location
     async with httpx.AsyncClient() as client:
         if req.city:
             response = await client.get(
@@ -84,6 +91,11 @@ async def search_cars(req: CarSearchRequest):
 class LocationRequest(BaseModel):
     latitude: float
     longitude: float
+    number_of_cars: Optional[int] = None
+    min_price: Optional[int] = None
+    max_price: Optional[int] = None
+    min_milage: Optional[int] = None
+    max_milage: Optional[int] = None
 
 class LocationResponse(BaseModel):
     location: str
@@ -117,27 +129,42 @@ async def get_cars_by_city(city_request: CityRequest):
 
 @app.post("/cars-near-me")
 async def get_cars_near_me(location_request: LocationRequest):
+    print(f">>> number_of_cars: {location_request.number_of_cars}, min_price: {location_request.min_price}, max_price: {location_request.max_price}, min_milage: {location_request.min_milage}, max_milage: {location_request.max_milage}")
     lat = location_request.latitude
     lon = location_request.longitude
+    num = location_request.number_of_cars or 15
+    min_price = location_request.min_price
+    max_price = location_request.max_price
+    min_milage = location_request.min_milage
+    max_milage = location_request.max_milage
+
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"https://nominatim.openstreetmap.org/reverse",
+            "https://nominatim.openstreetmap.org/reverse",
             params={"lat": lat, "lon": lon, "format": "json"},
             headers={"User-Agent": "KijijiCarSearcher/1.0"}
         )
-        geo_data = response.json()
-        address = geo_data.get("address", {})
-        
-        city = address.get("city") or address.get("town")
-        region = address.get("state") or address.get("province")
-    cars = await scrape_kijiji(target=15, city=city)
-    
-    # Return cars (you can add distance filtering here later)
+        address = response.json().get("address", {})
+
+    city   = address.get("city") or address.get("town")
+    region = address.get("state") or address.get("province")
+    buffer = num * 10
+    cars = await scrape_kijiji(target=buffer, city=city)
+
+    # apply filters
+    if min_price is not None:
+        cars = [c for c in cars if priceToInt(c.get("price", "0")) >= min_price]
+    if max_price is not None:
+        cars = [c for c in cars if priceToInt(c.get("price", "0")) <= max_price]
+    if min_milage is not None:
+        cars = [c for c in cars if mileageToInt(c.get("mileage", "0")) >= min_milage]
+    if max_milage is not None:
+        cars = [c for c in cars if mileageToInt(c.get("mileage", "0")) <= max_milage]
+
     return {
         "location": f"{city}, {region}" if city else "Unknown",
-        "city": city,
-        "region": region,
-        "cars": cars,
+        "city":     city,
+        "region":   region,
+        "cars":     cars[:num] if num is not None else cars,
     }
-
