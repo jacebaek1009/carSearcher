@@ -149,7 +149,10 @@ async def get_cars_near_me(location_request: LocationRequest):
 
     city   = address.get("city") or address.get("town")
     region = address.get("state") or address.get("province")
-    buffer = num * 10
+    if min_price or min_milage or max_price or max_milage:
+        buffer = num * 5
+    else:
+        buffer = num
     cars = await scrape_kijiji(target=buffer, city=city)
 
     # apply filters
